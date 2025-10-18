@@ -42,6 +42,8 @@ Screenshots of the project
 
 ![Capture2](https://github.com/user-attachments/assets/f421da28-94ce-4c55-a98a-51c414593bda)
 
+![Capture5](https://github.com/user-attachments/assets/3581fc9f-ff03-477a-ab98-79c62d0a2401)
+
 ![Capture3](https://github.com/user-attachments/assets/7f93b7a3-53b4-492d-8298-06f553f2c167)
 
 ![Capture4](https://github.com/user-attachments/assets/e25f9f92-4948-430d-9aa1-188d9da3173a)
