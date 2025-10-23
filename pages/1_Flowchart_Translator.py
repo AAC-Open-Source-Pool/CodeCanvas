@@ -106,42 +106,10 @@ st.markdown(f"""
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }}
 
-/* PREMIUM GLASS CARD */
-.glass {{
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 24px;
-    padding: 28px 32px;
+/* CLEAN SECTION STYLING */
+.section-container {{
+    padding: 20px 0;
     margin: 16px 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.1),
-                0 0 0 1px rgba(139, 92, 246, 0.1);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}}
-
-.glass::before {{
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
-    transition: left 0.5s;
-}}
-
-.glass:hover::before {{
-    left: 100%;
-}}
-
-.glass:hover {{
-    border-color: rgba(139, 92, 246, 0.3);
-    box-shadow: 0 12px 48px rgba(139, 92, 246, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
 }}
 
 .label {{
@@ -603,16 +571,59 @@ Requirements:
 
 def is_casual_query(prompt):
     """Check if the prompt is a casual conversation query"""
+    prompt_lower = prompt.lower().strip()
+    
+    # Short casual responses (acknowledgments, greetings, etc.)
+    short_casual = [
+        'ok', 'okay', 'thanks', 'thx', 'thank you', 'got it', 'cool', 
+        'nice', 'great', 'awesome', 'perfect', 'yes', 'no', 'yep', 'nope',
+        'sure', 'alright', 'k', 'kk', 'ty', 'understood', 'got it',
+        'hi', 'hello', 'hey', 'bye', 'goodbye'
+    ]
+    
+    # Check if it's a short casual response (exact match or very short)
+    if prompt_lower in short_casual or len(prompt.split()) <= 2 and any(word in prompt_lower for word in short_casual):
+        return True
+    
+    # Question words and conversational patterns
     casual_patterns = [
         'what', 'why', 'how', 'explain', 'tell me', 'can you', 
         'what did', 'what changes', 'what have you', 'describe',
-        'show me', 'which', 'where', 'when', 'who'
+        'show me', 'which', 'where', 'when', 'who', 'difference',
+        'compare', 'is there', 'are there', 'does it', 'do you'
     ]
-    prompt_lower = prompt.lower().strip()
+    
     return any(pattern in prompt_lower for pattern in casual_patterns)
 
 def handle_conversational_query(prompt, current_code, last_modification, target_language, _client):
     """Handle conversational queries about the code"""
+    prompt_lower = prompt.lower().strip()
+    
+    # Handle short acknowledgments without calling API
+    short_responses = {
+        'ok': "👍 Great! Let me know if you need anything else.",
+        'okay': "👍 Perfect! Feel free to ask if you need more help.",
+        'thanks': "You're welcome! 😊 Happy to help anytime.",
+        'thx': "You're welcome! 😊",
+        'thank you': "You're very welcome! 😊 Glad I could help.",
+        'got it': "Awesome! 👍 Let me know if you need anything else.",
+        'cool': "😎 Glad you like it!",
+        'nice': "😊 Thanks! Anything else I can help with?",
+        'great': "🎉 Glad it works for you!",
+        'perfect': "✨ Perfect! Let me know if you need more changes.",
+        'yes': "👍 Got it!",
+        'no': "👍 No problem!",
+        'sure': "👍 Sounds good!",
+        'alright': "👍 Great!",
+        'k': "👍",
+        'kk': "👍👍",
+        'ty': "You're welcome! 😊"
+    }
+    
+    if prompt_lower in short_responses:
+        return short_responses[prompt_lower]
+    
+    # For actual questions, use AI with retry logic
     context = f"""You are a helpful coding assistant. The user has {target_language} code and is asking a question about it.
 
 Current Code:
@@ -626,15 +637,26 @@ User Question: {prompt}
 
 Provide a friendly, conversational response. Explain clearly what was changed, why it was changed, or answer their question about the code. Keep it natural and helpful, like a real conversation."""
 
-    response = _client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[context]
-    )
-    
-    return response.text.strip()
+    # Retry logic for API calls
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = _client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[context]
+            )
+            return response.text.strip()
+        except Exception as e:
+            if "503" in str(e) or "overloaded" in str(e).lower():
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                else:
+                    return "⏳ The AI service is busy right now. Please wait a moment and try again."
+            raise e
 
 def regenerate_code_with_customization(original_code, user_request, target_language, _client):
-    """Regenerate code based on user request"""
+    """Regenerate code based on user request with retry logic"""
     prompt = f"""You are an expert {target_language} programmer.
 
 Original Code:
@@ -648,12 +670,23 @@ Task: Modify the code according to the user's request. Output ONLY the modified 
 
 Modified Code:"""
 
-    response = _client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[prompt]
-    )
-    
-    return response.text.strip()
+    # Retry logic for API calls
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = _client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt]
+            )
+            return response.text.strip()
+        except Exception as e:
+            if "503" in str(e) or "overloaded" in str(e).lower():
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                else:
+                    raise Exception("⏳ The AI service is busy right now. Please wait 30 seconds and try again.")
+            raise e
 
 def run_codecanvas_pipeline(image_np, target_language, _client, _yolo_model, _reader):
     time.sleep(1)
@@ -684,7 +717,7 @@ st.markdown("""
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.markdown('<div class="glass">', unsafe_allow_html=True)
+    st.markdown('<div class="section-container">', unsafe_allow_html=True)
     st.markdown('<span class="label">🎯 Target Language</span>', unsafe_allow_html=True)
     target_language = st.selectbox(
         "lang",
@@ -696,7 +729,7 @@ with col1:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
-    st.markdown('<div class="glass">', unsafe_allow_html=True)
+    st.markdown('<div class="section-container">', unsafe_allow_html=True)
     st.markdown('<span class="label">📤 Input Method</span>', unsafe_allow_html=True)
     input_method = st.radio(
         "input",
@@ -732,17 +765,15 @@ if target_language != st.session_state.current_language:
                     model='gemini-2.5-flash',
                     contents=[final_prompt_text, original_image_pil]
                 )
+                # UPDATE THE MAIN CODE (not chat)
                 st.session_state.generated_code = response.text.strip()
                 st.session_state.current_language = target_language
                 st.session_state.last_modification = f"Converted to {target_language}"
                 
-                # Add language change notification to chat
-                st.session_state.chat_history.append({
-                    "role": "assistant", 
-                    "content": f"✅ Code converted to {target_language}!"
-                })
+                # Clear chat history when language changes
+                st.session_state.chat_history = []
                 
-                # Force rerun to update syntax highlighting
+                # Force rerun to update display
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error converting language: {e}")
@@ -831,6 +862,10 @@ if st.session_state.generated_code:
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            # If message contains code, display it in a code block
+            if "code" in message:
+                msg_syntax_lang = syntax_languages.get(message.get("language", st.session_state.current_language), "text")
+                st.code(message["code"], language=msg_syntax_lang, line_numbers=True)
     
     # Chat input
     if prompt := st.chat_input("💭 Ask me anything: 'add error handling', 'what did you change?', 'make it shorter'"):
@@ -860,7 +895,7 @@ if st.session_state.generated_code:
                             "content": response_text
                         })
                     else:
-                        # Handle as code modification request
+                        # Handle as code modification request - Generate NEW code in chat
                         new_code = regenerate_code_with_customization(
                             st.session_state.generated_code,
                             prompt,
@@ -868,17 +903,24 @@ if st.session_state.generated_code:
                             client
                         )
                         
-                        # Update code and notify user
-                        st.session_state.generated_code = new_code
+                        # Update last modification tracking (but DON'T update main code)
                         st.session_state.last_modification = prompt
-                        response_text = f"✅ Done! I've updated the code above. {prompt.capitalize()}."
+                        
+                        # Display response with new code in chat
+                        response_text = f"✅ I've updated the code based on your request. Here's the new version:"
                         st.markdown(response_text)
+                        
+                        # Get syntax language for display
+                        msg_syntax_lang = syntax_languages.get(st.session_state.current_language, "text")
+                        st.code(new_code, language=msg_syntax_lang, line_numbers=True)
+                        
+                        # Add to chat history with code
                         st.session_state.chat_history.append({
                             "role": "assistant", 
-                            "content": response_text
+                            "content": response_text,
+                            "code": new_code,
+                            "language": st.session_state.current_language
                         })
-                        time.sleep(0.3)
-                        st.rerun()
                         
                 except Exception as e:
                     error_msg = f"❌ Sorry, I encountered an error: {str(e)}"
