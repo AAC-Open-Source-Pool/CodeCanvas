@@ -1,5 +1,7 @@
 # CodeCanvas: Flowchart-to-Code Translator
 
+[![Project Logo](static/CodeCanvasLogo.png)]
+
 ## Table of Contents
 - [Introduction](#introduction) <br>
 - [Requirements](#requirements) <br>
@@ -66,3 +68,4 @@ This section provides instructions and details on how to submit a contribution v
 3. Improved OCR Error Handling: Introduce conditional image processing (e.g., dynamic contrast adjustment) specifically on failed OCR regions to enhance text extraction from poor-quality images.
 4. Code Assistant Features: Add context-aware capabilities to the chat assistant, such as suggesting unit tests based on the extracted flowchart logic.
 5. Webcam Stabilization: Enhance the live camera input feature to include image stabilization or capture multiple frames to improve clarity for detection and OCR.
+
