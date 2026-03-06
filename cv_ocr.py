@@ -36,7 +36,7 @@ img_path = list(uploaded.keys())[0]
 img = cv2.imread(img_path)
 
 # ✅ Configure Gemini API (replace with your own key)
-genai.configure(api_key="AIzaSyC3n5gHWxAr-m5fCm_7xZvGZ25_tU8gzG0")
+genai.configure()
 model = genai.GenerativeModel("models/gemini-1.5-pro")  # For pure text
 
 
